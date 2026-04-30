@@ -1,0 +1,126 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "session-visualizer"
+version = "0.0.0"
+description = "Best-effort live visualization layer for OperantKit sessions: non-blocking EventSink, cumulative record, and on-budget model fitting over SSE."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+  { name = "OperantKit contributors" },
+]
+keywords = [
+  "behavior-analysis",
+  "operant-conditioning",
+  "cumulative-record",
+  "live-dashboard",
+  "experiment",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = [
+  # session-analyzer owns the canonical visualizer / theme / suggester
+  # implementations. Nearly every documented HTTP endpoint
+  # (/theme.json, /figure/*, /suggest) is backed by it, so the upstream
+  # contract is not honoured without it. Installed as an editable
+  # sibling during development (pip install -e ../../analysis/session-analyzer).
+  "session-analyzer",
+]
+
+[project.optional-dependencies]
+# ---- Lightweight descriptive stats + linear fits for mid-session ticks
+# (e.g. generalized-matching slope via log-log OLS, moving-window response
+# rate, IRT descriptives). Kept deliberately small so `[fit]` does not
+# pull in pymc/statsmodels. These are the fits allowed to run on the
+# in-process periodic tick (10 s / 1 min cadence).
+fit = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+]
+
+# ---- Streaming / realtime transport extras. The sink + aggregator
+# themselves do not need these; they are for consumers that want to pipe
+# snapshots over WebSockets or async file tails. Left empty by default so
+# installing `[realtime]` is a no-op today — the slot exists to keep the
+# install surface stable as we add async transports.
+realtime = []
+
+server = [
+  "fastapi>=0.110",
+  "sse-starlette>=2.0",
+  "uvicorn>=0.29",
+]
+
+# ---- Kitchen-sink: everything needed to run a live dashboard with
+# in-process light fits. Does NOT include [test]/[dev] — those are for
+# maintainers.
+full = [
+  "session-visualizer[fit,realtime,server]",
+]
+
+test = [
+  "pytest>=8",
+  "pytest-cov",
+]
+dev = [
+  "session-visualizer[test,server,fit]",
+  "mypy>=1.10",
+  "ruff>=0.5",
+]
+
+[project.scripts]
+session-visualizer = "session_visualizer.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/OperantKit"
+Repository = "https://github.com/OperantKit/session-visualizer"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/session_visualizer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "--strict-markers",
+  "--strict-config",
+  "-ra",
+]
+markers = [
+  "unit: pure unit tests with no external dependencies",
+  "integration: tests that exercise cross-module interactions",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["session_visualizer"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "raise NotImplementedError",
+  "\\.\\.\\.",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C4", "SIM", "RET"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true

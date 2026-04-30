@@ -1,0 +1,17 @@
+.venv/
+.venv-fresh/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.local/
+PLAN.md
+
+# uv package manager is banned; any accidental uv.lock must not be tracked.
+uv.lock
