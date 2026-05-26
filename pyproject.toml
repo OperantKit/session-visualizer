@@ -35,6 +35,11 @@ dependencies = [
   # contract is not honoured without it. Installed as an editable
   # sibling during development (pip install -e ../../analysis/session-analyzer).
   "session-analyzer",
+  # session-recorder is required by OKLTailReader for cross-process
+  # tailing of OKL v1 logs. Already pulled in transitively via
+  # session-analyzer; declared here explicitly so the dependency is
+  # not silently broken if session-analyzer's deps change.
+  "session-recorder",
 ]
 
 [project.optional-dependencies]
@@ -55,6 +60,15 @@ fit = [
 # install surface stable as we add async transports.
 realtime = []
 
+# ---- Filesystem watcher for the cross-process tail source. With
+# `watchdog` installed, LogTailSource wakes on file modifications
+# instead of waiting out the poll interval, lowering tail latency.
+# Without it, plain time-based polling is used (functional, just less
+# responsive).
+stream = [
+  "watchdog>=4.0",
+]
+
 server = [
   "fastapi>=0.110",
   "sse-starlette>=2.0",
@@ -65,7 +79,7 @@ server = [
 # in-process light fits. Does NOT include [test]/[dev] — those are for
 # maintainers.
 full = [
-  "session-visualizer[fit,realtime,server]",
+  "session-visualizer[fit,realtime,server,stream]",
 ]
 
 test = [
@@ -73,7 +87,7 @@ test = [
   "pytest-cov",
 ]
 dev = [
-  "session-visualizer[test,server,fit]",
+  "session-visualizer[test,server,fit,stream]",
   "mypy>=1.10",
   "ruff>=0.5",
 ]

@@ -56,24 +56,78 @@ def compute_fits(
     """Run the subset of session-analyzer fits that need only a single
     session's response/reinforcement time stream.
 
+    Currently emits:
+
+    - ``bouts``: log-survivor bout decomposition (>= 10 responses).
+    - ``latency``: response/reinforcement latency descriptives.
+    - ``pr_classification``: Hodos / linear / unknown PR schedule
+      classification (>= 1 reinforcer; full classification requires
+      >= 3).
+    - ``irt_breakpoint``: live IRT-within-current-step break-point
+      indicator with ``active`` / ``approaching`` / ``reached`` /
+      ``insufficient_data`` status (>= 2 responses since the last
+      reinforcer, or in total when no reinforcers have been delivered).
+
     Returns ``None`` if ``session-analyzer`` is not importable. This lets
     callers render a degraded dashboard ("fits unavailable") without
     branching on import errors.
     """
     try:
-        from session_analyzer.analytics import analyze_bouts, analyze_latencies
+        from session_analyzer.analytics import (
+            analyze_bouts,
+            analyze_latencies,
+            classify_pr_schedule,
+            estimate_irt_breakpoint,
+            extract_step_ratios,
+        )
     except ImportError:
         return None
 
+    response_list = list(response_times)
+    reinforcement_list = list(reinforcement_times)
+
     out: dict[str, FitResult] = {}
-    if len(response_times) >= 10:
-        out["bouts"] = _try_fit("bouts", analyze_bouts, list(response_times))
-    if response_times and reinforcement_times:
+    if len(response_list) >= 10:
+        out["bouts"] = _try_fit("bouts", analyze_bouts, response_list)
+    if response_list and reinforcement_list:
         out["latency"] = _try_fit(
             "latency",
             analyze_latencies,
-            list(response_times),
-            list(reinforcement_times),
+            response_list,
+            reinforcement_list,
+        )
+    if reinforcement_list:
+        ratios = extract_step_ratios(response_list, reinforcement_list)
+        pr_classification = _try_fit(
+            "pr_classification", classify_pr_schedule, ratios
+        )
+        out["pr_classification"] = pr_classification
+
+        # Surface the IRT-based break-point only when we have at least a
+        # tentative current-step requirement (from the classification);
+        # otherwise the indicator is harder to interpret on a dashboard.
+        current_req = 0
+        last_completed = 0
+        if pr_classification.value is not None:
+            current_req = getattr(pr_classification.value, "current_requirement", 0)
+            last_completed = getattr(pr_classification.value, "last_completed_ratio", 0)
+        out["irt_breakpoint"] = _try_fit(
+            "irt_breakpoint",
+            estimate_irt_breakpoint,
+            response_list,
+            reinforcement_list,
+            last_completed_ratio=last_completed,
+            current_requirement=current_req,
+        )
+    elif len(response_list) >= 2:
+        # No reinforcement yet — still report IRT break-point on the
+        # bare response stream so the dashboard surfaces "approaching"
+        # behaviour during the very first ratio.
+        out["irt_breakpoint"] = _try_fit(
+            "irt_breakpoint",
+            estimate_irt_breakpoint,
+            response_list,
+            reinforcement_list,
         )
     return out
 

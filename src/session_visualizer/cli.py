@@ -97,8 +97,8 @@ def _cmd_tail(args: argparse.Namespace) -> int:
         )
         return 2
 
-    from .jsonl_source import JSONLTailSource
     from .server import build_app
+    from .tail_source import JSONLTailReader, LogTailSource, OKLTailReader, TailReader
 
     log_path = Path(args.log)
     sink = NonBlockingEventSink(maxsize=args.queue_size)
@@ -112,9 +112,18 @@ def _cmd_tail(args: argparse.Namespace) -> int:
         except FileNotFoundError:
             start_offset = 0
 
-    tail = JSONLTailSource(
+    reader: TailReader
+    if args.format == "okl":
+        reader = OKLTailReader()
+    elif args.format == "jsonl":
+        reader = JSONLTailReader()
+    else:  # pragma: no cover - argparse choices guard this
+        raise ValueError(f"unknown --format: {args.format!r}")
+
+    tail = LogTailSource(
         log_path,
         sinks=[sink],
+        reader=reader,
         poll_interval=args.poll_interval,
         use_watchdog=not args.no_watchdog,
         start_offset=start_offset,
@@ -153,15 +162,24 @@ def main(argv: list[str] | None = None) -> int:
     tail = sub.add_parser(
         "tail",
         help=(
-            "Tail a JSONL file being written by a separate process / "
-            "machine and serve a live SSE dashboard"
+            "Tail a session log file being written by a separate process "
+            "or machine and serve a live SSE dashboard"
         ),
     )
     tail.add_argument(
         "log",
         help=(
-            "Path to the JSONL file being written. Need not exist yet; "
-            "the source will pick it up once the writer creates it."
+            "Path to the log file being written. Need not exist yet; the "
+            "source will pick it up once the writer creates it."
+        ),
+    )
+    tail.add_argument(
+        "--format",
+        choices=("okl", "jsonl"),
+        default="okl",
+        help=(
+            "Log format. 'okl' (default) parses OKL v1 written by "
+            "session-recorder. 'jsonl' parses one JSON object per line."
         ),
     )
     tail.add_argument("--host", default="127.0.0.1")

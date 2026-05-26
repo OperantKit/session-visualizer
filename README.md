@@ -28,6 +28,10 @@ language-agnostic contract for clients (browsers, native apps, notebooks,
 
 ## Integration
 
+### Same-process attachment (default)
+
+Attach a sink to a running ``Session`` for the lowest-latency path:
+
 ```python
 from experiment_core import Session
 from session_visualizer import NonBlockingEventSink, LiveAggregator
@@ -48,7 +52,51 @@ session-visualizer serve --host 127.0.0.1 --port 8765
 
 and point `operantkit-frontend` at `http://127.0.0.1:8765/events`.
 
-For post-hoc replay of an existing JSONL log at wall-clock speed:
+### Cross-process tail
+
+When the experiment runs in a separate process — different machine,
+embedded device writing to a shared mount, supervised subprocess —
+tail the on-disk session log instead. The same SSE / HTTP surface is
+served regardless of input source.
+
+```
+# Default: OKL v1 produced by session-recorder
+session-visualizer tail path/to/session.txt
+
+# Plain JSONL written by a custom embedded producer
+session-visualizer tail path/to/events.jsonl --format jsonl
+
+# Skip events written before the visualizer started
+session-visualizer tail path/to/session.txt --from-end
+```
+
+Programmatic use:
+
+```python
+from session_visualizer import (
+    JSONLTailReader,
+    LiveAggregator,
+    LogTailSource,
+    NonBlockingEventSink,
+    OKLTailReader,
+)
+
+sink = NonBlockingEventSink(maxsize=4096)
+aggregator = LiveAggregator(sink)
+aggregator.start()
+
+# OKLTailReader is the default; pass JSONLTailReader for plain JSON.
+source = LogTailSource("/mnt/embedded-rig/session.txt", sinks=[sink])
+source.start()
+```
+
+Install ``session-visualizer[stream]`` for ``watchdog``-based
+filesystem signals (lower tail latency); plain time-based polling is
+used as a fallback when ``watchdog`` is missing.
+
+### Post-hoc replay
+
+To replay an existing JSONL log at wall-clock speed:
 
 ```
 session-visualizer replay path/to/session.jsonl --speed 4
@@ -108,6 +156,7 @@ mise exec -- python -m venv .venv
 | `[fit]` | `numpy`, `scipy` | Light periodic-tick fits (linear regression, moving windows) |
 | `[realtime]` | (reserved) | Future async transports (WebSocket, async file tail) |
 | `[server]` | `fastapi`, `sse-starlette`, `uvicorn` | HTTP/SSE dashboard endpoint |
+| `[stream]` | `watchdog` | Filesystem watcher for `LogTailSource` (lower tail latency) |
 | `[analytics]` | `session-analyzer` (sibling) | Heavy fits hand-off |
 | `[full]` | all of the above | End-user "just works" install |
 
