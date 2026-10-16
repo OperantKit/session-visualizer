@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+title: "session-visualizer"
+authors:
+  - name: "OperantKit contributors"
+repository-code: "https://github.com/OperantKit/session-visualizer"
+license: MIT
+abstract: "Best-effort live visualization layer for OperantKit sessions: non-blocking EventSink, cumulative record, and on-budget model fitting over SSE."
