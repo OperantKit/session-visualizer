@@ -30,18 +30,21 @@ language-agnostic contract for clients (browsers, native apps, notebooks,
 
 ### Same-process attachment (default)
 
-Attach a sink to a running ``Session`` for the lowest-latency path:
+Attach a sink to a running ``Session`` for the lowest-latency path (with `SessionRunner`, pass the sink as `sink=`, as in the 30-second example below):
 
 ```python
+from contingency import ScheduleBuilder
 from experiment_core import Session
-from session_visualizer import NonBlockingEventSink, LiveAggregator
+from session_visualizer import LiveAggregator, NonBlockingEventSink, SessionEventBridge
 
 sink = NonBlockingEventSink(maxsize=4096)
 aggregator = LiveAggregator(sink)
 aggregator.start()
 
-session = Session(..., sinks=[recorder_sink, sink])  # sibling of session-recorder
-session.run()
+session = Session(ScheduleBuilder.fr(3))
+bridge = SessionEventBridge(session, sinks=[sink])  # add an OklSink here to record as well
+session.start(0.0)
+bridge.sync()  # call after every session operation
 ```
 
 For a live dashboard:
@@ -73,6 +76,7 @@ session-visualizer tail path/to/session.txt --from-end
 Programmatic use:
 
 ```python
+# requires a log file that another process is writing
 from session_visualizer import (
     JSONLTailReader,
     LiveAggregator,
@@ -86,7 +90,7 @@ aggregator = LiveAggregator(sink)
 aggregator.start()
 
 # OKLTailReader is the default; pass JSONLTailReader for plain JSON.
-source = LogTailSource("/mnt/embedded-rig/session.txt", sinks=[sink])
+source = LogTailSource("/mnt/embedded-rig/session.okl", sinks=[sink])
 source.start()
 ```
 
@@ -108,7 +112,7 @@ session-visualizer replay path/to/session.jsonl --speed 4
   SSE). Counters and timestamps flow out of the experiment process
   without stalling it.
 - **Is not:** an authoritative record. The sink drops when saturated,
-  by design. Use `session-recorder`'s JSONL log for durable storage.
+  by design. Use `session-recorder`'s OKL v1 log for durable storage.
 - **Is not:** an authoritative statistical analyzer. Heavy fits
   (non-linear demand curves, EM bout decomposition, Bayesian matching-law
   CIs) live in `session-analyzer`. This package calls into it
@@ -126,6 +130,56 @@ The boundary is **CPU budget**, not "can it be computed at all": a
 generalized-matching slope over a few dozen reinforcers is trivially
 cheap and is allowed on the in-process tick; a Hursh-Silberberg α with
 bootstrap is not.
+
+## 30-second example
+
+```bash
+pip install git+https://github.com/OperantKit/session-visualizer
+pip install session-runner   # the session driver used below
+```
+
+Attach the non-blocking sink to a session and read the live snapshot that a dashboard would draw:
+
+```python
+from contingency import ScheduleBuilder
+from experiment_core import ReinforcementCountExit
+from session_runner import SessionConfig, SessionRunner
+from session_visualizer import LiveAggregator, NonBlockingEventSink
+
+sink = NonBlockingEventSink(maxsize=4096)  # emit() never waits; drops and counts when full
+aggregator = LiveAggregator(sink)
+aggregator.start()  # background thread builds the snapshot
+
+runner = SessionRunner(
+    SessionConfig(name="fr3", schedule=ScheduleBuilder.fr(3), exit_condition=ReinforcementCountExit(count=3)),
+    sink=sink,  # or tee(OklSink("fr3.okl"), sink) to record and watch at once
+)
+runner.start(start_time=0.0)
+t = 0.0
+while not runner.is_finished:
+    t += 1.0
+    if runner.is_reinforcing:
+        runner.end_reinforcement(t)
+    else:
+        runner.handle_response(t)
+
+aggregator.stop()  # final drain
+snapshot = aggregator.snapshot()
+print(snapshot.state, len(snapshot.response_times), snapshot.reinforcement_times)
+# FINISHED 9 (3.0, 7.0, 11.0)
+print(snapshot.sink_stats)
+# SinkStats(emitted=23, enqueued=23, dropped=0)
+```
+
+`snapshot.response_times` and `snapshot.reinforcement_times` are what the cumulative-record panel draws; `sink_stats.dropped` tells you whether the visualizer fell behind. `session-visualizer serve` exposes the same snapshot over HTTP/SSE.
+
+## Why not draw the live view from your own session loop?
+
+- **The experiment never waits for the display.** `NonBlockingEventSink.emit` is `put_nowait` on a bounded queue; when the queue is full the event is dropped and counted (`sink_stats.dropped`) instead of delaying the next response or reinforcer.
+- **Reads never contend with the producer.** A daemon `LiveAggregator` drains the queue and builds an immutable `Snapshot`; any thread can call `snapshot()` at any time.
+- **Same view for in-process and cross-process sessions.** Attach to a running session (`SessionEventBridge` or a `SessionRunner` sink), or tail an OKL v1 / JSONL file written by another process or machine (`LogTailSource`, `session-visualizer tail`).
+- **Fits on a CPU budget.** Light fits run on a periodic tick (`PeriodicTicker`, `FitThrottle`); heavy fits are handed to session-analyzer.
+- **Documented HTTP contract.** The SSE and figure endpoints are specified in `docs/en/http-api.md` for browsers, notebooks, or `curl`.
 
 ## Install
 
@@ -193,11 +247,11 @@ so the frontend can show a graceful empty state.
 
 For the Python API, the mapping table, TypeScript types, and the full
 list of suggested panels per DSL node, see the
-[`session-analyzer` README](../../analysis/session-analyzer/README.md#dsl-driven-analysis-suggestions-for-operantkit-frontend).
+[`session-analyzer` README](https://github.com/OperantKit/session-analyzer#dsl-driven-analysis-suggestions-for-operantkit-frontend).
 
 ## Related packages
 
 - `experiment-core` — `Session`, `EventSink` Protocol, event dataclasses.
-- `session-recorder` — durable JSONL log of the same event stream.
-- `session-analyzer` — offline fits and plots over JSONL logs.
+- `session-recorder` — durable OKL v1 log of the same event stream.
+- `session-analyzer` — offline fits and plots over OKL v1 logs.
 - `operantkit-frontend` — Next.js UI; consumes `/events` SSE.

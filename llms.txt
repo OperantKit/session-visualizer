@@ -1,0 +1,44 @@
+# session-visualizer
+
+> Live view of a running operant session without slowing it down: a non-blocking event sink, a background aggregator that keeps a cumulative-record snapshot (response and reinforcer times, session state, optional light fits), and an HTTP/SSE server for dashboards; it can also tail OKL v1 or JSONL logs written by another process.
+
+session-visualizer is part of OperantKit, a set of Python/Rust packages for designing and running operant and respondent conditioning experiments (reinforcement schedules, session recording, analysis). Use it instead of drawing from inside the session loop: emitting an event never waits (a full queue drops and counts the event), and snapshots are read without locking the producer.
+
+## Install
+
+```bash
+pip install git+https://github.com/OperantKit/session-visualizer
+```
+
+## Minimal example
+
+```python
+from contingency import ScheduleBuilder
+from session_runner import SessionConfig, SessionRunner
+from session_visualizer import LiveAggregator, NonBlockingEventSink
+
+sink = NonBlockingEventSink(maxsize=4096)
+aggregator = LiveAggregator(sink)
+aggregator.start()
+runner = SessionRunner(SessionConfig(name="fr3", schedule=ScheduleBuilder.fr(3)), sink=sink)
+runner.start(start_time=0.0)
+for t in (1.0, 2.0, 3.0):
+    runner.handle_response(t)
+aggregator.stop()
+print(aggregator.snapshot().reinforcement_times)  # (3.0,)
+```
+
+Dashboard: `session-visualizer serve --host 127.0.0.1 --port 8765` (SSE at `/events`). Another process's log: `session-visualizer tail session.okl`.
+
+## Docs
+
+- [README](https://github.com/OperantKit/session-visualizer/blob/main/README.md): design constraints, integration, 30-second example, extras
+- [AGENTS.md](https://github.com/OperantKit/session-visualizer/blob/main/AGENTS.md): when to use this package and what not to do
+- [HTTP API](https://github.com/OperantKit/session-visualizer/blob/main/docs/en/http-api.md): SSE and figure endpoints
+
+## Related packages
+
+- [session-runner](https://github.com/OperantKit/session-runner): session driver whose `sink` this package plugs into (`pip install session-runner`)
+- [experiment-core](https://github.com/OperantKit/experiment-core): session state machine and event types (`pip install experiment-core`)
+- [session-recorder](https://github.com/OperantKit/session-recorder): durable OKL v1 log of the same event stream (`pip install session-recorder`)
+- [session-analyzer](https://github.com/OperantKit/session-analyzer): offline and heavy fits, figure themes, analysis suggestions (`pip install session-analyzer`)

@@ -29,18 +29,21 @@ OperantKit の実験セッションに対するベストエフォート**ライ�
 
 ### 同一プロセス内 attach（既定）
 
-`Session` に sink を直結するのが最低遅延のパス:
+`Session` に sink を直結するのが最低遅延のパス（`SessionRunner` なら下の 30 秒の例のように `sink=` に渡す）:
 
 ```python
+from contingency import ScheduleBuilder
 from experiment_core import Session
-from session_visualizer import NonBlockingEventSink, LiveAggregator
+from session_visualizer import LiveAggregator, NonBlockingEventSink, SessionEventBridge
 
 sink = NonBlockingEventSink(maxsize=4096)
 aggregator = LiveAggregator(sink)
 aggregator.start()
 
-session = Session(..., sinks=[recorder_sink, sink])  # session-recorder と併用
-session.run()
+session = Session(ScheduleBuilder.fr(3))
+bridge = SessionEventBridge(session, sinks=[sink])  # 記録もするならここに OklSink を足す
+session.start(0.0)
+bridge.sync()  # セッションを操作するたびに呼ぶ
 ```
 
 ライブダッシュボードとして起動する場合:
@@ -72,6 +75,7 @@ session-visualizer tail path/to/session.txt --from-end
 Python API:
 
 ```python
+# requires a log file that another process is writing
 from session_visualizer import (
     JSONLTailReader,
     LiveAggregator,
@@ -85,7 +89,7 @@ aggregator = LiveAggregator(sink)
 aggregator.start()
 
 # 既定の reader は OKLTailReader。plain JSON なら JSONLTailReader を渡す。
-source = LogTailSource("/mnt/embedded-rig/session.txt", sinks=[sink])
+source = LogTailSource("/mnt/embedded-rig/session.okl", sinks=[sink])
 source.start()
 ```
 
@@ -107,7 +111,7 @@ session-visualizer replay path/to/session.jsonl --speed 4
   snapshot → SSE）。実験プロセスを止めずにカウンタ・タイムスタンプを
   外に流す。
 - **該当しない:** 正本記録。sink は飽和時にドロップする設計。耐久的な
-  保存は `session-recorder` の JSONL を使う。
+  保存は `session-recorder` の OKL v1 を使う。
 - **該当しない:** 正本の統計解析器。重いフィット（非線形需要曲線、
   EM によるバウト分解、ブートストラップ CI 付きマッチング法則）は
   `session-analyzer` が担う。optional extra `analytics` を入れた場合
@@ -125,6 +129,56 @@ session-visualizer replay path/to/session.jsonl --speed 4
 数十個の強化子に対する一般化マッチング法則の傾き（log-log OLS）は
 ごく軽量なので定期 tick で走らせてよい。Hursh-Silberberg α の
 ブートストラップ推定はそうではない。
+
+## 30 秒で動く例
+
+```bash
+pip install git+https://github.com/OperantKit/session-visualizer
+pip install session-runner   # 下で使うセッション駆動部
+```
+
+待たない sink をセッションに付け、ダッシュボードが描くはずのライブのスナップショットを読む:
+
+```python
+from contingency import ScheduleBuilder
+from experiment_core import ReinforcementCountExit
+from session_runner import SessionConfig, SessionRunner
+from session_visualizer import LiveAggregator, NonBlockingEventSink
+
+sink = NonBlockingEventSink(maxsize=4096)  # emit() は待たない。満杯なら捨てて数える
+aggregator = LiveAggregator(sink)
+aggregator.start()  # 背景スレッドがスナップショットを作る
+
+runner = SessionRunner(
+    SessionConfig(name="fr3", schedule=ScheduleBuilder.fr(3), exit_condition=ReinforcementCountExit(count=3)),
+    sink=sink,  # 記録と観測を同時に行うなら tee(OklSink("fr3.okl"), sink)
+)
+runner.start(start_time=0.0)
+t = 0.0
+while not runner.is_finished:
+    t += 1.0
+    if runner.is_reinforcing:
+        runner.end_reinforcement(t)
+    else:
+        runner.handle_response(t)
+
+aggregator.stop()  # 残りを取り込んで止める
+snapshot = aggregator.snapshot()
+print(snapshot.state, len(snapshot.response_times), snapshot.reinforcement_times)
+# FINISHED 9 (3.0, 7.0, 11.0)
+print(snapshot.sink_stats)
+# SinkStats(emitted=23, enqueued=23, dropped=0)
+```
+
+累積記録のパネルが描くのは `snapshot.response_times` と `snapshot.reinforcement_times` である。`sink_stats.dropped` で可視化が遅れたかどうかが分かる。`session-visualizer serve` は同じスナップショットを HTTP/SSE で公開する。
+
+## 自分のセッションループからライブ表示を描かない理由
+
+- **実験は表示を待たない.** `NonBlockingEventSink.emit` は上限つきキューへの `put_nowait` で、キューが満杯ならイベントを捨てて数える（`sink_stats.dropped`）。次の反応や強化子を遅らせない。
+- **読み出しが生産側と競合しない.** デーモンの `LiveAggregator` がキューを取り込み、不変の `Snapshot` を作る。どのスレッドからでもいつでも `snapshot()` を呼べる。
+- **同一プロセスでも別プロセスでも同じ表示.** 動いているセッションに付ける（`SessionEventBridge` か `SessionRunner` の sink）か、別のプロセスや機械が書く OKL v1 / JSONL ファイルを追う（`LogTailSource`、`session-visualizer tail`）。
+- **CPU の予算内でのフィット.** 軽いフィットは定期 tick（`PeriodicTicker`、`FitThrottle`）で走り、重いフィットは session-analyzer に渡す。
+- **文書化された HTTP 契約.** SSE と図のエンドポイントは `docs/en/http-api.md` に定め、ブラウザ・ノートブック・`curl` から使える。
 
 ## インストール
 
@@ -191,12 +245,12 @@ Content-Type: application/json
 frontend 側で graceful に空状態を表示できるようにする。
 
 Python API・マッピング表・TypeScript 型定義は
-[`session-analyzer` README](../../analysis/session-analyzer/README.ja.md#DSL-駆動の分析提案operantkit-frontend-連携用)
+[`session-analyzer` README](https://github.com/OperantKit/session-analyzer/blob/main/README.ja.md)
 を参照。
 
 ## 関連パッケージ
 
 - `experiment-core` — `Session`, `EventSink` Protocol, イベント dataclass
-- `session-recorder` — 同じイベントストリームの JSONL 耐久ログ
-- `session-analyzer` — JSONL に対するオフラインのフィットと描画
+- `session-recorder` — 同じイベントストリームの OKL v1 耐久ログ
+- `session-analyzer` — OKL v1 ログに対するオフラインのフィットと描画
 - `operantkit-frontend` — Next.js UI、`/events` SSE を購読する

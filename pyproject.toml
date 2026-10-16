@@ -85,6 +85,8 @@ full = [
 test = [
   "pytest>=8",
   "pytest-cov",
+  # README examples drive a session with session-runner.
+  "session-runner",
 ]
 dev = [
   "session-visualizer[test,server,fit,stream]",
