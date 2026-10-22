@@ -1,0 +1,76 @@
+# Clean-clone CI: install this package with its test extras and run pytest.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # OperantKit packages this repo depends on, in dependency order (leaves
+  # first), installed from GitHub until they are published on PyPI.
+  OPERANTKIT_SIBLINGS: "contingency-dsl-py contingency-py experiment-core session-recorder session-runner session-analyzer"
+  # Branch, tag or SHA to take the siblings from.
+  OPERANTKIT_SIBLING_REF: main
+  # hatch-vcs derives 0.1.1.devN from the v0.1.0 tag, which does not satisfy
+  # ">=0.1.1,<0.2"; siblings are built under this version instead.
+  OPERANTKIT_SIBLING_VERSION: "0.1.1"
+  # Repos the tests read from the parent directory (cloned, not installed).
+  OPERANTKIT_NEIGHBORS: ""
+
+jobs:
+  pytest:
+    name: pytest (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11"]
+        experimental: [false]
+        include:
+          # 3.12 is optional: a failure here does not fail the workflow.
+          - python-version: "3.12"
+            experimental: true
+    continue-on-error: ${{ matrix.experimental }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Check out neighbor repos next to this one
+        if: env.OPERANTKIT_NEIGHBORS != ''
+        run: |
+          for n in $OPERANTKIT_NEIGHBORS; do
+            git clone --depth 1 "https://github.com/OperantKit/$n" "$GITHUB_WORKSPACE/../$n"
+          done
+
+      - name: Install OperantKit siblings from GitHub (dependency order)
+        if: env.OPERANTKIT_SIBLINGS != ''
+        run: |
+          python -m pip install --upgrade pip
+          for dep in $OPERANTKIT_SIBLINGS; do
+            SETUPTOOLS_SCM_PRETEND_VERSION="$OPERANTKIT_SIBLING_VERSION" \
+              python -m pip install --no-cache-dir \
+                "$dep @ git+https://github.com/OperantKit/$dep@$OPERANTKIT_SIBLING_REF"
+          done
+
+      - name: Install this package with test extras
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+          python -m pip check
+
+      - name: pytest
+        run: python -m pytest -q
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
