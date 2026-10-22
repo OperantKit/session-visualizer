@@ -186,6 +186,12 @@ print(snapshot.sink_stats)
 ```
 mise exec -- python -m venv .venv
 
+# OperantKit dependencies, from GitHub until they are on PyPI. Install them
+# first, in this order, so each one finds the previous ones already installed:
+for p in contingency-dsl-py contingency-py experiment-core session-recorder session-analyzer; do
+  .venv/bin/python -m pip install "$p @ git+https://github.com/OperantKit/$p"
+done
+
 # Minimum viable viz (no numpy/scipy):
 .venv/bin/python -m pip install -e .
 
@@ -197,10 +203,6 @@ mise exec -- python -m venv .venv
 
 # Maintainers:
 .venv/bin/python -m pip install -e ".[dev,server]"
-
-# Sibling packages for end-to-end use:
-.venv/bin/python -m pip install -e ../../experiment/experiment-core
-.venv/bin/python -m pip install -e ../../analysis/session-analyzer
 ```
 
 ### Extras

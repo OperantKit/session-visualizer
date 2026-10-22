@@ -32,14 +32,14 @@ dependencies = [
   # session-analyzer owns the canonical visualizer / theme / suggester
   # implementations. Nearly every documented HTTP endpoint
   # (/theme.json, /figure/*, /suggest) is backed by it, so the upstream
-  # contract is not honoured without it. Installed as an editable
-  # sibling during development (pip install -e ../../analysis/session-analyzer).
-  "session-analyzer",
+  # contract is not honoured without it. Until it is on PyPI, install it
+  # from GitHub (git+https://github.com/OperantKit/session-analyzer).
+  "session-analyzer>=0.1.1,<0.2",
   # session-recorder is required by OKLTailReader for cross-process
   # tailing of OKL v1 logs. Already pulled in transitively via
   # session-analyzer; declared here explicitly so the dependency is
   # not silently broken if session-analyzer's deps change.
-  "session-recorder",
+  "session-recorder>=0.1.1,<0.2",
 ]
 
 [project.optional-dependencies]
@@ -84,9 +84,13 @@ full = [
 
 test = [
   "pytest>=8",
-  "pytest-cov",
+  "pytest-cov>=5",
   # README examples drive a session with session-runner.
-  "session-runner",
+  "session-runner>=0.1.1,<0.2",
+  # The server tests (tests/test_server_*.py) drive the FastAPI app through
+  # fastapi.testclient, which needs httpx; without these they are skipped.
+  "httpx>=0.27",
+  "session-visualizer[server]",
 ]
 dev = [
   "session-visualizer[test,server,fit,stream]",

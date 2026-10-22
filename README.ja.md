@@ -185,6 +185,12 @@ print(snapshot.sink_stats)
 ```
 mise exec -- python -m venv .venv
 
+# OperantKit の依存パッケージ（PyPI に載るまでは GitHub から）。先に、
+# この順で入れる（各パッケージが前のものを入った状態で見つけられるように）:
+for p in contingency-dsl-py contingency-py experiment-core session-recorder session-analyzer; do
+  .venv/bin/python -m pip install "$p @ git+https://github.com/OperantKit/$p"
+done
+
 # 最小構成（numpy/scipy 無し）:
 .venv/bin/python -m pip install -e .
 
@@ -196,10 +202,6 @@ mise exec -- python -m venv .venv
 
 # メンテナ:
 .venv/bin/python -m pip install -e ".[dev,server]"
-
-# エンドツーエンド利用時の sibling パッケージ:
-.venv/bin/python -m pip install -e ../../experiment/experiment-core
-.venv/bin/python -m pip install -e ../../analysis/session-analyzer
 ```
 
 ### extras 一覧
