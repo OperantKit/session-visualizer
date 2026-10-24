@@ -152,4 +152,4 @@ Every `python` block in this README and `README.ja.md` is run by `tests/test_rea
 
 ## License
 
-MIT (declared in `pyproject.toml`; the repository has no LICENSE file).
+MIT. See [LICENSE](LICENSE).

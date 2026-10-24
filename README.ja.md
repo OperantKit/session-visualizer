@@ -152,4 +152,4 @@ python -m venv .venv
 
 ## ライセンス
 
-MIT（`pyproject.toml` で宣言。リポジトリに LICENSE ファイルはありません）。
+MIT です。[LICENSE](LICENSE) を参照してください。
