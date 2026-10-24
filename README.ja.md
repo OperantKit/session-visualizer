@@ -12,16 +12,22 @@ session-visualizer は、オペラント実験のセッションを走らせな�
 
 ## インストール
 
-Python 3.11 以上が必要です。session-visualizer はまだ PyPI に登録されていないため、`pip install session-visualizer` は今のところ使えません。session-visualizer と、それが必要とする OperantKit のパッケージを依存の解決をせずに GitHub から入れ、外部ライブラリを足してください。`fastapi`・`sse-starlette`・`uvicorn` は HTTP サーバにだけ、session-runner は下の例にだけ必要です。
+
+Python 3.11 以上が必要です。session-visualizer はまだ PyPI に登録されていません。session-visualizer と、それが必要とする OperantKit のパッケージを一緒に GitHub から入れ、外部ライブラリを足してください。`fastapi`・`sse-starlette`・`uvicorn` は HTTP サーバにだけ、session-runner は下の例にだけ必要です。
 
 ```bash
-G=git+https://github.com/OperantKit
-pip install --no-deps $G/contingency-dsl-py $G/contingency-py $G/experiment-core \
-  $G/session-recorder $G/session-runner $G/session-analyzer $G/session-visualizer
-pip install numpy scipy matplotlib fastapi sse-starlette uvicorn
+# PyPI に公開されるまでは、OperantKit の依存と一緒に GitHub から入れる。
+pip install git+https://github.com/OperantKit/contingency-dsl-py \
+            git+https://github.com/OperantKit/contingency-py \
+            git+https://github.com/OperantKit/experiment-core \
+            git+https://github.com/OperantKit/session-runner \
+            git+https://github.com/OperantKit/session-recorder \
+            git+https://github.com/OperantKit/session-analyzer \
+            git+https://github.com/OperantKit/session-visualizer
+pip install fastapi sse-starlette uvicorn
 ```
 
-`pip check` はこれらの開発版どうしのバージョンの食い違いを報告しますが、以下の例の動作には影響しません。
+依存は pip が解決するので、`pip check` は何も報告しません。
 
 ## 例
 

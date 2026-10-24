@@ -7,7 +7,13 @@ session-visualizer is part of OperantKit, a set of Python/Rust packages for desi
 ## Install
 
 ```bash
-pip install git+https://github.com/OperantKit/session-visualizer
+# Until the PyPI release, install from GitHub together with its OperantKit dependencies.
+pip install git+https://github.com/OperantKit/contingency-dsl-py \
+            git+https://github.com/OperantKit/contingency-py \
+            git+https://github.com/OperantKit/experiment-core \
+            git+https://github.com/OperantKit/session-recorder \
+            git+https://github.com/OperantKit/session-analyzer \
+            git+https://github.com/OperantKit/session-visualizer
 ```
 
 ## Minimal example
@@ -38,7 +44,7 @@ Dashboard: `session-visualizer serve --host 127.0.0.1 --port 8765` (SSE at `/eve
 
 ## Related packages
 
-- [session-runner](https://github.com/OperantKit/session-runner): session driver whose `sink` this package plugs into (`pip install session-runner`)
-- [experiment-core](https://github.com/OperantKit/experiment-core): session state machine and event types (`pip install experiment-core`)
-- [session-recorder](https://github.com/OperantKit/session-recorder): durable OKL v1 log of the same event stream (`pip install session-recorder`)
-- [session-analyzer](https://github.com/OperantKit/session-analyzer): offline and heavy fits, figure themes, analysis suggestions (`pip install session-analyzer`)
+- [session-runner](https://github.com/OperantKit/session-runner): session driver whose `sink` this package plugs into
+- [experiment-core](https://github.com/OperantKit/experiment-core): session state machine and event types
+- [session-recorder](https://github.com/OperantKit/session-recorder): durable OKL v1 log of the same event stream
+- [session-analyzer](https://github.com/OperantKit/session-analyzer): offline and heavy fits, figure themes, analysis suggestions
