@@ -27,8 +27,14 @@ The dependency direction is fixed by [`apps/SCOPE`](../../../../SCOPE):
 ## Starting the server
 
 ```bash
-uvicorn session_visualizer.cli:app --host 127.0.0.1 --port 8765
+session-visualizer serve --host 127.0.0.1 --port 8765
 ```
+
+`serve` starts the server with an empty aggregator. To serve a session log
+written by another process, use `session-visualizer tail <log>` with the same
+`--host` and `--port` options. To serve a session in the same process, build
+the app with `session_visualizer.server.build_app(aggregator)` and run it with
+`uvicorn.run(app, host=..., port=...)`.
 
 All endpoints below are served under the chosen `--host:--port`.
 
