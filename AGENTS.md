@@ -34,3 +34,12 @@ Use behavior-analytic terms: *reinforcer* (not "reward"), *discriminative stimul
 - Python 3.11+. Create the environment with `python -m venv .venv` and `.venv/bin/python -m pip install -e ".[dev]"`; run `.venv/bin/pytest`.
 - `README.md` (English) is canonical; keep `README.ja.md` in sync in the same commit.
 - Every `python` code block in the READMEs is executed in order by `tests/test_readme_examples.py`, except blocks whose first line starts with `# requires`.
+
+## Why not draw the live view from your own session loop?
+
+- **The experiment never waits for the display.** `NonBlockingEventSink.emit` is `put_nowait` on a bounded queue; when the queue is full the event is dropped and counted (`sink_stats.dropped`) instead of delaying the next response or reinforcer.
+- **Reads never contend with the producer.** A daemon `LiveAggregator` drains the queue and builds an immutable `Snapshot`; any thread can call `snapshot()` at any time.
+- **Same view for in-process and cross-process sessions.** Attach to a running session (`SessionEventBridge` or a `SessionRunner` sink), or tail an OKL v1 / JSONL file written by another process or machine (`LogTailSource`, `session-visualizer tail`).
+- **Fits on a CPU budget.** Light fits run on a periodic tick (`PeriodicTicker`, `FitThrottle`); heavy fits are handed to session-analyzer.
+- **Documented HTTP contract.** The SSE and figure endpoints are specified in `docs/en/http-api.md` for browsers, notebooks, or `curl`.
+

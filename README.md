@@ -2,157 +2,47 @@
 
 :jp: [日本語版 README](README.ja.md)
 
-Best-effort **live** visualization layer for OperantKit experiment sessions.
-Attaches to a running `experiment-core` `Session` via the `EventSink`
-Protocol and exposes an always-available snapshot (cumulative record,
-reinforcement ticks, state, optional model fits) over HTTP/SSE so that
-`operantkit-frontend` — or any dashboard — can draw the session as it
-runs.
+session-visualizer lets you watch an operant session while it runs: the cumulative record, reinforcer marks, the session state, and optional light model fits, served over HTTP to a browser, a notebook, or [operantkit-frontend](https://github.com/OperantKit/operantkit-frontend). It is for people who run sessions with [OperantKit](https://github.com/OperantKit) and want a live view without risking the session's timing. It attaches to a session in the same Python process, or follows the log file that another process or machine is writing.
 
-**HTTP API reference:** [`docs/en/http-api.md`](docs/en/http-api.md) —
-language-agnostic contract for clients (browsers, native apps, notebooks,
-`curl`).
+- **The session never waits for the display.** Events go into a bounded queue; if the viewer falls behind, events are dropped from the view and counted, never delayed.
+- **Same view for local and remote sessions.** Attach to a session in your own program, or follow an OKL or JSONL log file as it grows.
+- **A documented HTTP interface.** Snapshots, a live stream, and cumulative-record figures; see the [HTTP API reference](docs/en/http-api.md).
 
-## Design constraints
+The view is not a record: use [session-recorder](https://github.com/OperantKit/session-recorder) for the durable log and [session-analyzer](https://github.com/OperantKit/session-analyzer) for final analyses. Notes for AI coding agents are in [AGENTS.md](AGENTS.md).
 
-1. **The experiment thread must never block.** `NonBlockingEventSink.emit`
-   is O(1), uses `queue.Queue.put_nowait`, and drops events (incrementing
-   a counter) when its bounded queue is full rather than waiting.
-2. **The visualizer may lag.** A daemon `LiveAggregator` thread drains the
-   queue and maintains an incremental snapshot. Snapshot reads are
-   copy-on-read and never contend with the producer.
-3. **No client connected → no work done.** The SSE server reads the
-   aggregator's current snapshot at a fixed cadence only while a client
-   is subscribed. Heavy fits (GML, demand curve) run on demand and can
-   be skipped under CPU pressure.
+## Installation
 
-## Integration
-
-### Same-process attachment (default)
-
-Attach a sink to a running ``Session`` for the lowest-latency path (with `SessionRunner`, pass the sink as `sink=`, as in the 30-second example below):
-
-```python
-from contingency import ScheduleBuilder
-from experiment_core import Session
-from session_visualizer import LiveAggregator, NonBlockingEventSink, SessionEventBridge
-
-sink = NonBlockingEventSink(maxsize=4096)
-aggregator = LiveAggregator(sink)
-aggregator.start()
-
-session = Session(ScheduleBuilder.fr(3))
-bridge = SessionEventBridge(session, sinks=[sink])  # add an OklSink here to record as well
-session.start(0.0)
-bridge.sync()  # call after every session operation
-```
-
-For a live dashboard:
-
-```
-session-visualizer serve --host 127.0.0.1 --port 8765
-```
-
-and point `operantkit-frontend` at `http://127.0.0.1:8765/events`.
-
-### Cross-process tail
-
-When the experiment runs in a separate process — different machine,
-embedded device writing to a shared mount, supervised subprocess —
-tail the on-disk session log instead. The same SSE / HTTP surface is
-served regardless of input source.
-
-```
-# Default: OKL v1 produced by session-recorder
-session-visualizer tail path/to/session.txt
-
-# Plain JSONL written by a custom embedded producer
-session-visualizer tail path/to/events.jsonl --format jsonl
-
-# Skip events written before the visualizer started
-session-visualizer tail path/to/session.txt --from-end
-```
-
-Programmatic use:
-
-```python
-# requires a log file that another process is writing
-from session_visualizer import (
-    JSONLTailReader,
-    LiveAggregator,
-    LogTailSource,
-    NonBlockingEventSink,
-    OKLTailReader,
-)
-
-sink = NonBlockingEventSink(maxsize=4096)
-aggregator = LiveAggregator(sink)
-aggregator.start()
-
-# OKLTailReader is the default; pass JSONLTailReader for plain JSON.
-source = LogTailSource("/mnt/embedded-rig/session.okl", sinks=[sink])
-source.start()
-```
-
-Install ``session-visualizer[stream]`` for ``watchdog``-based
-filesystem signals (lower tail latency); plain time-based polling is
-used as a fallback when ``watchdog`` is missing.
-
-### Post-hoc replay
-
-To replay an existing JSONL log at wall-clock speed:
-
-```
-session-visualizer replay path/to/session.jsonl --speed 4
-```
-
-## What this tool is (and is not)
-
-- **Is:** a realtime observation pipeline (sink → aggregator → snapshot →
-  SSE). Counters and timestamps flow out of the experiment process
-  without stalling it.
-- **Is not:** an authoritative record. The sink drops when saturated,
-  by design. Use `session-recorder`'s OKL v1 log for durable storage.
-- **Is not:** an authoritative statistical analyzer. Heavy fits
-  (non-linear demand curves, EM bout decomposition, Bayesian matching-law
-  CIs) live in `session-analyzer`. This package calls into it
-  opportunistically when the optional `analytics` extra is installed.
-
-### What runs in-process vs. hand-off
-
-| Tier | What | Where | Extra |
-|---|---|---|---|
-| Cumulative record, response ticks, state | drawn every frame | `LiveAggregator` snapshot | (core) |
-| Moving-window rate, IRT descriptives, log-log GML slope | periodic tick (e.g. 10 s / 1 min) | `PeriodicTicker` + light fits | `[fit]` |
-| Non-linear demand curve, EM bout decomp, bootstrap CIs | session end / on demand | `session-analyzer` | `[analytics]` |
-
-The boundary is **CPU budget**, not "can it be computed at all": a
-generalized-matching slope over a few dozen reinforcers is trivially
-cheap and is allowed on the in-process tick; a Hursh-Silberberg α with
-bootstrap is not.
-
-## 30-second example
+Python 3.11 or newer. session-visualizer is not on PyPI yet, so `pip install session-visualizer` does not work today. Install it and the OperantKit packages it needs from GitHub without dependency resolution, then add the third-party libraries. `fastapi`, `sse-starlette`, and `uvicorn` are needed only for the HTTP server; session-runner only for the example below.
 
 ```bash
-pip install git+https://github.com/OperantKit/session-visualizer
-pip install session-runner   # the session driver used below
+G=git+https://github.com/OperantKit
+pip install --no-deps $G/contingency-dsl-py $G/contingency-py $G/experiment-core \
+  $G/session-recorder $G/session-runner $G/session-analyzer $G/session-visualizer
+pip install numpy scipy matplotlib fastapi sse-starlette uvicorn
 ```
 
-Attach the non-blocking sink to a session and read the live snapshot that a dashboard would draw:
+`pip check` reports version mismatches between these development builds; they do not affect the examples below.
+
+## Example
+
+Run a short FR 3 session, record it to an OKL file, and watch it at the same time:
 
 ```python
 from contingency import ScheduleBuilder
 from experiment_core import ReinforcementCountExit
-from session_runner import SessionConfig, SessionRunner
+from session_recorder import OklSink
+from session_runner import SessionConfig, SessionRunner, tee
 from session_visualizer import LiveAggregator, NonBlockingEventSink
 
 sink = NonBlockingEventSink(maxsize=4096)  # emit() never waits; drops and counts when full
 aggregator = LiveAggregator(sink)
 aggregator.start()  # background thread builds the snapshot
 
+log = OklSink("fr3.txt")
+log.write_header(session_name="fr3", clock_type="VirtualClock", session_start=0.0)
 runner = SessionRunner(
     SessionConfig(name="fr3", schedule=ScheduleBuilder.fr(3), exit_condition=ReinforcementCountExit(count=3)),
-    sink=sink,  # or tee(OklSink("fr3.okl"), sink) to record and watch at once
+    sink=tee(log, sink),  # record and watch at once
 )
 runner.start(start_time=0.0)
 t = 0.0
@@ -171,89 +61,95 @@ print(snapshot.sink_stats)
 # SinkStats(emitted=23, enqueued=23, dropped=0)
 ```
 
-`snapshot.response_times` and `snapshot.reinforcement_times` are what the cumulative-record panel draws; `sink_stats.dropped` tells you whether the visualizer fell behind. `session-visualizer serve` exposes the same snapshot over HTTP/SSE.
+`snapshot.response_times` and `snapshot.reinforcement_times` are what the cumulative-record panel draws; `sink_stats.dropped` tells you whether the viewer fell behind. To see the same session in a browser, serve the log file:
 
-## Why not draw the live view from your own session loop?
-
-- **The experiment never waits for the display.** `NonBlockingEventSink.emit` is `put_nowait` on a bounded queue; when the queue is full the event is dropped and counted (`sink_stats.dropped`) instead of delaying the next response or reinforcer.
-- **Reads never contend with the producer.** A daemon `LiveAggregator` drains the queue and builds an immutable `Snapshot`; any thread can call `snapshot()` at any time.
-- **Same view for in-process and cross-process sessions.** Attach to a running session (`SessionEventBridge` or a `SessionRunner` sink), or tail an OKL v1 / JSONL file written by another process or machine (`LogTailSource`, `session-visualizer tail`).
-- **Fits on a CPU budget.** Light fits run on a periodic tick (`PeriodicTicker`, `FitThrottle`); heavy fits are handed to session-analyzer.
-- **Documented HTTP contract.** The SSE and figure endpoints are specified in `docs/en/http-api.md` for browsers, notebooks, or `curl`.
-
-## Install
-
-```
-mise exec -- python -m venv .venv
-
-# OperantKit dependencies, from GitHub until they are on PyPI. Install them
-# first, in this order, so each one finds the previous ones already installed:
-for p in contingency-dsl-py contingency-py experiment-core session-recorder session-analyzer; do
-  .venv/bin/python -m pip install "$p @ git+https://github.com/OperantKit/$p"
-done
-
-# Minimum viable viz (no numpy/scipy):
-.venv/bin/python -m pip install -e .
-
-# With lightweight periodic fits (numpy + scipy; log-log OLS etc.):
-.venv/bin/python -m pip install -e ".[fit]"
-
-# Full live dashboard (server + fit + analytics hand-off + realtime):
-.venv/bin/python -m pip install -e ".[full]"
-
-# Maintainers:
-.venv/bin/python -m pip install -e ".[dev,server]"
+```bash
+session-visualizer tail fr3.txt --port 8765
 ```
 
-### Extras
+`http://127.0.0.1:8765/snapshot` then returns the same counts (9 responses, 3 reinforcers, state `FINISHED`), and `http://127.0.0.1:8765/figure/cumulative-record` returns the cumulative record as a PNG.
+
+## Usage
+
+### Following a log file
+
+When the session runs in another process or on another machine, follow the log it writes. The HTTP interface is the same as for a session in your own process.
+
+```bash
+session-visualizer tail session.txt                    # OKL log written by session-recorder
+session-visualizer tail events.jsonl --format jsonl    # plain JSONL from your own program
+session-visualizer tail session.txt --from-end         # skip events written before the viewer started
+```
+
+Installing `watchdog` (`pip install watchdog`) lets the tail react to file changes instead of polling, which lowers the delay. From Python, `LogTailSource` does the same with `OKLTailReader` (default) or `JSONLTailReader`.
+
+### Attaching to a session in the same process
+
+```python
+from contingency import ScheduleBuilder
+from experiment_core import Session
+from session_visualizer import LiveAggregator, NonBlockingEventSink, SessionEventBridge
+
+sink = NonBlockingEventSink(maxsize=4096)
+aggregator = LiveAggregator(sink)
+aggregator.start()
+
+session = Session(ScheduleBuilder.fr(3))
+bridge = SessionEventBridge(session, sinks=[sink])  # add an OklSink here to record as well
+session.start(0.0)
+bridge.sync()  # call after every session operation
+```
+
+With session-runner, pass the sink as `sink=`, as in the example above. To serve it over HTTP, build the app with `session_visualizer.server.build_app(aggregator)` and run it with uvicorn.
+
+### HTTP interface
+
+`/snapshot` (current state as JSON), `/events` (a server-sent-events stream of snapshots), `/figure/cumulative-record`, `/figure/irt-coded-cumulative-record`, `/figure/response-rate`, `/theme.json`, and `POST /suggest` (the analyses worth showing for a [contingency-dsl](https://github.com/OperantKit/contingency-dsl) expression, from session-analyzer's [analysis suggestions](https://github.com/OperantKit/session-analyzer/blob/main/docs/en/suggestions.md)). Parameters and response formats are in the [HTTP API reference](docs/en/http-api.md).
+
+### What runs during the session
+
+| What | When | Where |
+|---|---|---|
+| Cumulative record, response marks, state | Every update | `LiveAggregator` snapshot |
+| Moving-window rate, IRT descriptives, log-log generalized-matching slope | On a periodic tick (for example 10 s or 1 min) | `PeriodicTicker` with light fits (`FitThrottle`, `compute_fits`) |
+| Non-linear demand curve, EM bout decomposition, bootstrap confidence intervals | After the session | session-analyzer |
+
+The boundary is CPU cost, not whether a measure can be computed: a generalized-matching slope over a few dozen reinforcers is cheap enough for the periodic tick; a demand-curve fit with bootstrap is not.
+
+### Optional extras
 
 | Extra | Adds | Purpose |
 |---|---|---|
-| `[fit]` | `numpy`, `scipy` | Light periodic-tick fits (linear regression, moving windows) |
-| `[realtime]` | (reserved) | Future async transports (WebSocket, async file tail) |
-| `[server]` | `fastapi`, `sse-starlette`, `uvicorn` | HTTP/SSE dashboard endpoint |
-| `[stream]` | `watchdog` | Filesystem watcher for `LogTailSource` (lower tail latency) |
-| `[analytics]` | `session-analyzer` (sibling) | Heavy fits hand-off |
-| `[full]` | all of the above | End-user "just works" install |
+| `[fit]` | `numpy`, `scipy` | Light periodic fits |
+| `[server]` | `fastapi`, `sse-starlette`, `uvicorn` | HTTP server |
+| `[stream]` | `watchdog` | File-change signals for `tail` |
+| `[realtime]` | nothing | Installs no packages |
+| `[full]` | `[fit]`, `[server]`, `[stream]`, `[realtime]` | Everything above |
 
-## Test
+### Replaying a JSONL log
 
+```bash
+session-visualizer replay events.jsonl --speed 4
 ```
+
+replays a JSONL log at four times wall-clock speed and prints the final counts.
+
+## Limitations
+
+- The live view drops events when its queue is full, by design. It is not a record of the session.
+- `replay` reads JSONL only, not OKL.
+- `session-visualizer serve` starts a server with an empty view, for a program that attaches its own events; to watch a session from the command line, use `tail`.
+
+## Development
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/pytest
 ```
 
-## DSL-driven analysis suggestions (via `session-analyzer`)
+Every `python` block in this README and `README.ja.md` is run by `tests/test_readme_examples.py`.
 
-The visualizer can serve the panel-recommendation API owned by
-`session-analyzer` over HTTP so that `operantkit-frontend` can decide
-which live panels to render before a session starts.
+## License
 
-The endpoint is registered only when `session-analyzer` is installed
-(the `[analytics]` extra or an editable sibling install):
-
-```
-POST /suggest
-Content-Type: application/json
-
-<contingency-dsl resolved AST — Program or ScheduleExpr subtree>
-```
-
-Response:
-
-```
-{"suggestions": [{"name": "...", "reason": "...", "tier": "light" | "heavy"}, ...]}
-```
-
-Malformed input returns HTTP 200 with `{"suggestions": [], "error": "..."}`
-so the frontend can show a graceful empty state.
-
-For the Python API, the mapping table, TypeScript types, and the full
-list of suggested panels per DSL node, see the
-[`session-analyzer` README](https://github.com/OperantKit/session-analyzer#dsl-driven-analysis-suggestions-for-operantkit-frontend).
-
-## Related packages
-
-- `experiment-core` — `Session`, `EventSink` Protocol, event dataclasses.
-- `session-recorder` — durable OKL v1 log of the same event stream.
-- `session-analyzer` — offline fits and plots over OKL v1 logs.
-- `operantkit-frontend` — Next.js UI; consumes `/events` SSE.
+MIT (declared in `pyproject.toml`; the repository has no LICENSE file).
