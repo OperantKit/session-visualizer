@@ -25,8 +25,14 @@
 ## サーバ起動
 
 ```bash
-uvicorn session_visualizer.cli:app --host 127.0.0.1 --port 8765
+session-visualizer serve --host 127.0.0.1 --port 8765
 ```
+
+`serve` は空の aggregator でサーバを起動する。別プロセスが書いているセッション
+ログを配信するには、同じ `--host`・`--port` オプションで
+`session-visualizer tail <log>` を使う。同じプロセス内のセッションを配信するには、
+`session_visualizer.server.build_app(aggregator)` でアプリを作り、
+`uvicorn.run(app, host=..., port=...)` で走らせる。
 
 以下のエンドポイントは指定した `--host:--port` 配下で提供される。
 
