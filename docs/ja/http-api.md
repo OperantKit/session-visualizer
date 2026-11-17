@@ -13,7 +13,7 @@
 
 - **`session-visualizer`** は HTTP/SSE 表面、in-memory `LiveAggregator`、
   `EventSink` Protocol を所有する。**ブラウザ UI は同梱しない**。
-- **クライアント**（`operantkit-frontend`、Jupyter、ネイティブアプリ等）は
+- **クライアント**(`operantkit-frontend`、Jupyter、ネイティブアプリ等) は
   描画・インタラクション・Export ボタン等の UX を所有する。
 - **`session-analyzer`** は静的図生成とテーマレジストリを所有する。
   `session-visualizer` は必須依存として analyzer を import し、
@@ -40,12 +40,12 @@ session-visualizer serve --host 127.0.0.1 --port 8765
 
 | メソッド | パス | 用途 |
 |---------|------|------|
-| `GET` | `/snapshot` | 現在の aggregator 状態を一発取得（JSON） |
+| `GET` | `/snapshot` | 現在の aggregator 状態を一発取得 (JSON) |
 | `GET` | `/events` | 一定間隔でスナップショットを配信する SSE ストリーム |
 | `GET` | `/theme.json` | テーマ一覧または単一テーマ仕様を取得 |
-| `GET` | `/figure/cumulative-record` | 静的累積記録図（PNG/SVG/PDF） |
+| `GET` | `/figure/cumulative-record` | 静的累積記録図 (PNG/SVG/PDF) |
 | `GET` | `/figure/irt-coded-cumulative-record` | DRL/DRO 向け IRT コード化累積記録 |
-| `GET` | `/figure/response-rate` | 移動窓応答率タイムライン（rpm） |
+| `GET` | `/figure/response-rate` | 移動窓応答率タイムライン (rpm) |
 | `POST` | `/suggest` | DSL AST に対する推奨分析パネル |
 
 全エンドポイントは常に登録される。`session-analyzer` は
@@ -76,7 +76,7 @@ session-visualizer serve --host 127.0.0.1 --port 8765
 ## `GET /events`
 
 Server-Sent-Events ストリーム。各 tick は `/snapshot` と同じペイロードを
-`event: snapshot` として配信する。既定配信間隔は 2 Hz（500 ms ごとに 1 フレーム）。
+`event: snapshot` として配信する。既定配信間隔は 2 Hz (500 ms ごとに 1 フレーム)。
 配信間隔はサーバ構築時に `build_app(push_interval=...)` で固定される。
 
 ### レスポンス
@@ -97,7 +97,7 @@ data: {...}
 
 テーマメタデータを取得する。テーマは宣言的・描画エンジン非依存な仕様として
 `session-analyzer` で定義されている。クライアントはこの仕様を各自の描画ライブラリ
-（recharts, D3, matplotlib, Plotly, GDI+ 等）の設定に変換する。
+(recharts, D3, matplotlib, Plotly, GDI+ 等) の設定に変換する。
 
 ### 一覧モード
 
@@ -139,7 +139,7 @@ data: {...}
 
 ### ステータスコード
 
-- `200 OK` — テーマが見つかった（または一覧返却）
+- `200 OK` — テーマが見つかった (または一覧返却)
 - `404 Not Found` — 未知のテーマ名
 
 ## `GET /figure/cumulative-record`
@@ -204,8 +204,8 @@ Ferster & Skinner 方式の IRT コード化累積記録。各応答を直前 IR
 
 | 名前 | 型 | 既定 | 備考 |
 |------|---|------|------|
-| `window_sec` | float | **必須** | 正値。窓幅（秒） |
-| `step_sec` | float | **必須** | 正値。グリッド刻み（秒） |
+| `window_sec` | float | **必須** | 正値。窓幅 (秒) |
+| `step_sec` | float | **必須** | 正値。グリッド刻み (秒) |
 | `theme` | string | `readable` | `/theme.json` が返す任意の id |
 | `fmt` | string | `png` | `png` / `svg` / `pdf` のいずれか |
 
@@ -254,7 +254,7 @@ curl -o drl.svg "http://127.0.0.1:8765/figure/irt-coded-cumulative-record?theme=
 curl -o rate.svg "http://127.0.0.1:8765/figure/response-rate?window_sec=10&step_sec=1&theme=nature-color&fmt=svg"
 ```
 
-### Python（`httpx`）
+### Python (`httpx`)
 
 ```python
 import httpx
@@ -265,7 +265,7 @@ async with httpx.AsyncClient(base_url="http://127.0.0.1:8765") as cli:
                          params={"theme": "nature-color", "fmt": "svg"})).content
 ```
 
-### ブラウザ（`fetch` + SSE）
+### ブラウザ (`fetch` + SSE)
 
 ```js
 const ev = new EventSource("http://127.0.0.1:8765/events");
@@ -281,7 +281,7 @@ const theme = await (await fetch("/theme.json?name=readable")).json();
 ### HTTP を叩ける任意の言語
 
 上記の契約は意図的に言語中立に保たれている。HTTP GET が投げられ、JSON が
-パースでき（あるいは SSE を購読でき、バイナリをファイルに保存でき）れば
+パースでき (あるいは SSE を購読でき、バイナリをファイルに保存でき) れば
 どんなクライアントでも統合できる。言語特化の SDK は同梱しない。
 **HTTP 契約そのものが SDK** である。
 

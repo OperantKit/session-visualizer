@@ -73,7 +73,7 @@ print(snapshot.sink_stats)
 session-visualizer tail fr3.txt --port 8765
 ```
 
-すると `http://127.0.0.1:8765/snapshot` が同じ数（反応 9 回、強化子 3 回、状態 `FINISHED`）を返し、`http://127.0.0.1:8765/figure/cumulative-record` が累積記録を PNG で返します。
+すると `http://127.0.0.1:8765/snapshot` が同じ数 (反応 9 回、強化子 3 回、状態 `FINISHED`) を返し、`http://127.0.0.1:8765/figure/cumulative-record` が累積記録を PNG で返します。
 
 ## 使い方
 
@@ -87,7 +87,7 @@ session-visualizer tail events.jsonl --format jsonl    # 自作プログラム�
 session-visualizer tail session.txt --from-end         # 表示を始める前に書かれた出来事は飛ばす
 ```
 
-`watchdog`（`pip install watchdog`）を入れると、tail は定期的に見に行く代わりにファイルの変化に反応するため、遅れが小さくなります。Python からは、`LogTailSource` に `OKLTailReader`（既定）か `JSONLTailReader` を渡して同じことができます。
+`watchdog` (`pip install watchdog`) を入れると、tail は定期的に見に行く代わりにファイルの変化に反応するため、遅れが小さくなります。Python からは、`LogTailSource` に `OKLTailReader` (既定) か `JSONLTailReader` を渡して同じことができます。
 
 ### 同じプロセスのセッションにつなぐ
 
@@ -110,19 +110,19 @@ session-runner を使う場合は、上の例のように `sink=` に渡して�
 
 ### HTTP の窓口
 
-`/snapshot`（今の状態の JSON）、`/events`（スナップショットを流す server-sent events）、`/figure/cumulative-record`、`/figure/irt-coded-cumulative-record`、`/figure/response-rate`、`/theme.json`、`POST /suggest`（[contingency-dsl](https://github.com/OperantKit/contingency-dsl) の式に対して表示する価値のある分析。session-analyzer の[分析の提案](https://github.com/OperantKit/session-analyzer/blob/main/docs/ja/suggestions.md)による）があります。パラメータと応答の形式は [HTTP API リファレンス](docs/ja/http-api.md)にあります。
+`/snapshot` (今の状態の JSON)、`/events` (スナップショットを流す server-sent events)、`/figure/cumulative-record`、`/figure/irt-coded-cumulative-record`、`/figure/response-rate`、`/theme.json`、`POST /suggest` ([contingency-dsl](https://github.com/OperantKit/contingency-dsl) の式に対して表示する価値のある分析。session-analyzer の[分析の提案](https://github.com/OperantKit/session-analyzer/blob/main/docs/ja/suggestions.md)による) があります。パラメータと応答の形式は [HTTP API リファレンス](docs/ja/http-api.md)にあります。
 
 ### セッション中に走るもの
 
 | 何を | いつ | どこで |
 |---|---|---|
 | 累積記録、反応の印、状態 | 更新のたび | `LiveAggregator` のスナップショット |
-| 移動窓の反応率、反応間時間（IRT）の記述統計、両対数の一般化マッチングの傾き | 定期的な更新（たとえば 10 秒か 1 分ごと） | `PeriodicTicker` と軽い当てはめ（`FitThrottle`、`compute_fits`） |
+| 移動窓の反応率、反応間時間 (IRT) の記述統計、両対数の一般化マッチングの傾き | 定期的な更新 (たとえば 10 秒か 1 分ごと) | `PeriodicTicker` と軽い当てはめ (`FitThrottle`、`compute_fits`) |
 | 非線形の需要曲線、EM によるバウトの分解、ブートストラップの信頼区間 | セッションの後 | session-analyzer |
 
 境目は計算できるかどうかではなく、CPU の負担です。数十回の強化子にもとづく一般化マッチングの傾きは定期的な更新で走らせられるほど軽く、ブートストラップ付きの需要曲線の当てはめはそうではありません。
 
-### 任意の追加パッケージ（extras）
+### 任意の追加パッケージ (extras)
 
 | extra | 追加するもの | 目的 |
 |---|---|---|
