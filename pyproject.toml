@@ -39,7 +39,7 @@ dependencies = [
   # tailing of OKL v1 logs. Already pulled in transitively via
   # session-analyzer; declared here explicitly so the dependency is
   # not silently broken if session-analyzer's deps change.
-  "session-recorder>=0.1.1,<0.2",
+  "session-recorder>=0.2,<0.3",
 ]
 
 [project.optional-dependencies]
