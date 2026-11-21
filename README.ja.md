@@ -150,6 +150,13 @@ JSONL のログを実時間の 4 倍の速さで再生し、最後の数を表�
 
 ```bash
 python -m venv .venv
+# PyPI に公開されるまでは、OperantKit の依存を先に GitHub から入れる。
+.venv/bin/python -m pip install git+https://github.com/OperantKit/session-recorder \
+                                git+https://github.com/OperantKit/session-analyzer \
+                                git+https://github.com/OperantKit/contingency-dsl-py \
+                                git+https://github.com/OperantKit/contingency-py \
+                                git+https://github.com/OperantKit/experiment-core \
+                                git+https://github.com/OperantKit/session-runner
 .venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/pytest
 ```

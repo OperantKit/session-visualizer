@@ -150,6 +150,13 @@ replays a JSONL log at four times wall-clock speed and prints the final counts.
 
 ```bash
 python -m venv .venv
+# Until the PyPI release, install the OperantKit dependencies from GitHub first.
+.venv/bin/python -m pip install git+https://github.com/OperantKit/session-recorder \
+                                git+https://github.com/OperantKit/session-analyzer \
+                                git+https://github.com/OperantKit/contingency-dsl-py \
+                                git+https://github.com/OperantKit/contingency-py \
+                                git+https://github.com/OperantKit/experiment-core \
+                                git+https://github.com/OperantKit/session-runner
 .venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/pytest
 ```
