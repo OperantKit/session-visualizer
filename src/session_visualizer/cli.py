@@ -22,30 +22,72 @@ from pathlib import Path
 from .aggregator import LiveAggregator
 from .sink import NonBlockingEventSink
 
+_PROG = "session-visualizer"
+_OKL_MAGIC = "# OKL"
+
+
+class _InputError(Exception):
+    """A user-facing input problem reported as one line on stderr (exit 2)."""
+
+
+def _first_nonblank_line(path: Path) -> str | None:
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if stripped:
+                return stripped
+    return None
+
+
+def _load_jsonl_events(path: Path) -> list[dict[str, object]]:
+    """Read every non-blank line of ``path`` as one JSON object.
+
+    Raises :class:`_InputError` for a missing file or the first line that is
+    not a JSON object. An OKL log gets a pointer to ``tail``.
+    """
+    if not path.is_file():
+        raise _InputError(f"file not found: {path}")
+    events: list[dict[str, object]] = []
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        for lineno, raw in enumerate(fh, start=1):
+            line = raw.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                obj = None
+            if not isinstance(obj, dict):
+                if not events and line.startswith(_OKL_MAGIC):
+                    raise _InputError(
+                        f"{path}:{lineno}: not JSONL (this looks like an OKL log; "
+                        f"replay reads JSONL only, use `{_PROG} tail {path}` for OKL)"
+                    )
+                raise _InputError(
+                    f"{path}:{lineno}: not JSONL (expected one JSON object per line)"
+                )
+            events.append(obj)
+    return events
+
 
 def _cmd_replay(args: argparse.Namespace) -> int:
-    log_path = Path(args.log)
+    events = _load_jsonl_events(Path(args.log))
     sink = NonBlockingEventSink(maxsize=args.queue_size)
     aggregator = LiveAggregator(sink)
     aggregator.start()
     start_wall = time.monotonic()
     start_session: float | None = None
     try:
-        with log_path.open() as fh:
-            for line in fh:
-                line = line.strip()
-                if not line:
-                    continue
-                event = json.loads(line)
-                ts = event.get("timestamp")
-                if isinstance(ts, (int, float)):
-                    if start_session is None:
-                        start_session = float(ts)
-                    target = float(ts) - start_session
-                    now = time.monotonic() - start_wall
-                    if target > now:
-                        time.sleep((target - now) / max(args.speed, 1e-9))
-                sink.emit(event)
+        for event in events:
+            ts = event.get("timestamp")
+            if isinstance(ts, (int, float)):
+                if start_session is None:
+                    start_session = float(ts)
+                target = float(ts) - start_session
+                now = time.monotonic() - start_wall
+                if target > now:
+                    time.sleep((target - now) / max(args.speed, 1e-9))
+            sink.emit(event)
         time.sleep(0.1)
         snap = aggregator.snapshot()
         print(
@@ -86,7 +128,21 @@ def _cmd_serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _check_tail_jsonl_input(path: Path) -> None:
+    """Refuse an existing OKL log under ``--format jsonl``.
+
+    A file that does not exist yet is fine: ``tail`` waits for the writer.
+    """
+    if path.is_file() and (_first_nonblank_line(path) or "").startswith(_OKL_MAGIC):
+        raise _InputError(
+            f"{path}:1: not JSONL (this looks like an OKL log; "
+            "use `--format okl`, the default)"
+        )
+
+
 def _cmd_tail(args: argparse.Namespace) -> int:
+    if args.format == "jsonl":
+        _check_tail_jsonl_input(Path(args.log))
     try:
         import uvicorn
     except ImportError:
@@ -205,7 +261,11 @@ def main(argv: list[str] | None = None) -> int:
     tail.set_defaults(func=_cmd_tail)
 
     args = parser.parse_args(argv)
-    return int(args.func(args))
+    try:
+        return int(args.func(args))
+    except _InputError as exc:
+        print(f"{_PROG}: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":  # pragma: no cover
