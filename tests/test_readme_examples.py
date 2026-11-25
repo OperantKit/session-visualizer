@@ -1,8 +1,9 @@
 """Execute the READMEs' examples so the documented commands keep working.
 
 Every ```python block of one README runs in order in a shared namespace inside
-a temporary directory. A block whose first line starts with ``# requires``
-needs external hardware or binaries and is skipped.
+a temporary directory, and what it prints is compared with the comments of its
+``print`` lines. A block whose first line starts with ``# requires`` needs
+external hardware or binaries and is skipped.
 
 In the ```bash blocks, every ``session-visualizer replay`` line is then run in
 the same directory (so it can read the files the python blocks wrote), and its
@@ -12,6 +13,8 @@ output is compared with the ``# <expected output>`` comment on the next line.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import re
 import shlex
 import subprocess
@@ -31,6 +34,31 @@ _RUN_CLI = "import sys; from session_visualizer.cli import main; sys.exit(main(s
 def _blocks(name: str) -> list[str]:
     blocks = _BLOCK.findall((ROOT / name).read_text(encoding="utf-8"))
     return [b for b in blocks if not b.startswith("# requires")]
+
+
+def _documented_output(code: str) -> list[str]:
+    """Output lines a README block documents in the comments of its ``print`` lines."""
+
+    def clean(comment: str) -> str:
+        return comment.split(" — ")[0].rstrip()  # drop a trailing " — note"
+
+    expected: list[str] = []
+    lines = code.splitlines()
+    for i, line in enumerate(lines):
+        if not line.lstrip().startswith("print("):
+            continue
+        _, same_line, comment = line.partition("  # ")
+        if same_line:  # print(x)  # X
+            expected.append(clean(comment))
+            continue
+        for nxt in lines[i + 1 :]:  # comment lines directly below the print
+            if nxt.startswith("#  ") and expected:  # "#" + 2 spaces: continues the line above
+                expected[-1] += " " + clean(nxt[1:].strip())
+            elif nxt.startswith("# "):
+                expected.append(clean(nxt[2:]))
+            else:
+                break
+    return expected
 
 
 def _replay_commands(name: str) -> list[tuple[list[str], str]]:
@@ -59,8 +87,13 @@ def _run_python_blocks(name: str) -> None:
 
 @pytest.mark.parametrize("name", READMES)
 def test_readme_examples_run(name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    expected = [line for block in _blocks(name) for line in _documented_output(block)]
+    assert expected, f"{name} documents no output"
     monkeypatch.chdir(tmp_path)
-    _run_python_blocks(name)
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        _run_python_blocks(name)
+    assert out.getvalue().splitlines() == expected
 
 
 @pytest.mark.parametrize("name", READMES)
