@@ -38,7 +38,7 @@ Dashboard: `session-visualizer serve --host 127.0.0.1 --port 8765` (SSE at `/eve
 
 ## Docs
 
-- [README](https://github.com/OperantKit/session-visualizer/blob/main/README.md): design constraints, integration, example, extras
+- [README](https://github.com/OperantKit/session-visualizer/blob/main/README.md): design constraints, integration, example, extras, replaying a JSONL log
 - [AGENTS.md](https://github.com/OperantKit/session-visualizer/blob/main/AGENTS.md): when to use this package and what not to do
 - [HTTP API](https://github.com/OperantKit/session-visualizer/blob/main/docs/en/http-api.md): SSE and figure endpoints
 

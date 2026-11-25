@@ -134,11 +134,29 @@ The boundary is CPU cost, not whether a measure can be computed: a generalized-m
 
 ### Replaying a JSONL log
 
-```bash
-session-visualizer replay events.jsonl --speed 4
+`replay` reads a file with one JSON object per line, feeds it to the view at the pace the events were recorded, and prints the final counts. Each line needs a `type` (`response`, `reinforcer_start`, or `state_change`) and a `timestamp` in session seconds; a `state_change` line also carries the new state in `to`. Other keys are ignored. `tail --format jsonl` counts lines of the same shape.
+
+```
+{"type": "response", "timestamp": 1.0, "id": 1, "operandum": null, "device_time": null}
 ```
 
-replays a JSONL log at four times wall-clock speed and prints the final counts.
+No OperantKit package writes this format directly. To get one from the `fr3.txt` of the example above, read the OKL log back with session-recorder:
+
+```python
+import json
+from session_recorder import iter_records
+
+with open("events.jsonl", "w") as f:
+    for rec in iter_records("fr3.txt"):
+        f.write(json.dumps({"type": rec.type, "timestamp": rec.timestamp, **rec.args}) + "\n")
+```
+
+```bash
+session-visualizer replay events.jsonl
+# responses=9 reinforcers=3 state=FINISHED dropped=0
+```
+
+The counts match the snapshot of the example (9 responses, 3 reinforcers, state `FINISHED`). The replay takes about as long as the session (12 seconds here).
 
 ## Limitations
 
@@ -161,7 +179,7 @@ python -m venv .venv
 .venv/bin/pytest
 ```
 
-Every `python` block in this README and `README.ja.md` is run by `tests/test_readme_examples.py`.
+Every `python` block in this README and `README.ja.md` is run by `tests/test_readme_examples.py`, and so is every `session-visualizer replay` line in the `bash` blocks, whose output is compared with the comment below it. The `tail` and `serve` lines are not run, because they start a server.
 
 ## License
 

@@ -134,11 +134,29 @@ session-runner を使う場合は、上の例のように `sink=` に渡して�
 
 ### JSONL のログを再生する
 
-```bash
-session-visualizer replay events.jsonl --speed 4
+`replay` は、1 行に 1 つの JSON オブジェクトを書いたファイルを読み、出来事が記録されたときの間隔で表示に流して、最後の数を表示します。各行には `type` (`response`、`reinforcer_start`、`state_change` のいずれか) と、セッション時間の秒で表した `timestamp` が要ります。`state_change` の行には、移った先の状態を `to` に書きます。ほかのキーは読みません。`tail --format jsonl` も同じ形の行を数えます。
+
+```
+{"type": "response", "timestamp": 1.0, "id": 1, "operandum": null, "device_time": null}
 ```
 
-JSONL のログを実時間の 4 倍の速さで再生し、最後の数を表示します。
+この形式をそのまま書く OperantKit のパッケージはありません。上の例の `fr3.txt` から作るには、session-recorder で OKL のログを読み直します。
+
+```python
+import json
+from session_recorder import iter_records
+
+with open("events.jsonl", "w") as f:
+    for rec in iter_records("fr3.txt"):
+        f.write(json.dumps({"type": rec.type, "timestamp": rec.timestamp, **rec.args}) + "\n")
+```
+
+```bash
+session-visualizer replay events.jsonl
+# responses=9 reinforcers=3 state=FINISHED dropped=0
+```
+
+数は例のスナップショット (反応 9 回、強化子 3 回、状態 `FINISHED`) と一致します。再生にはセッションとほぼ同じ時間 (ここでは 12 秒) がかかります。
 
 ## 制限
 
@@ -161,7 +179,7 @@ python -m venv .venv
 .venv/bin/pytest
 ```
 
-この README と `README.md` の `python` のコードブロックはすべて、`tests/test_readme_examples.py` が実行します。
+この README と `README.md` の `python` のコードブロックはすべて、`tests/test_readme_examples.py` が実行します。`bash` のコードブロックにある `session-visualizer replay` の行も実行し、その出力を下の行のコメントと比べます。`tail` と `serve` の行はサーバを立てるので実行しません。
 
 ## ライセンス
 
