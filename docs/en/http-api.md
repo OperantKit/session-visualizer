@@ -158,7 +158,7 @@ themselves, or for users who want a canonical paper-grade output.
 | `fmt` | string | `png` | One of `png`, `svg`, `pdf` |
 | `show_event_pen` | bool | `true` | Render the F&S event-pen trace below the cumulative record. The snapshot carries no event channels, so the panel is not drawn and the figure has the cumulative record alone |
 | `wrap` | bool | `true` | Whether the response pen wraps. `false` disables pen reset entirely |
-| `reset_responses` | int | *(canonical 550)* | Pen-reset interval when `wrap=true`. Must be a positive integer; ignored when `wrap=false` |
+| `reset_responses` | int | *(canonical 550)* | Pen-reset interval when `wrap=true`. Must be a positive integer; ignored when `wrap=false`. It does not fix the response axis: with fewer responses than the interval, the axis fits the record |
 
 ### Status codes
 
@@ -188,7 +188,7 @@ Intended for visualizing DRL / DRO performance.
 | `fmt` | string | `png` | One of `png`, `svg`, `pdf` |
 | `show_event_pen` | bool | `true` | Render the F&S event-pen trace below the cumulative record. The snapshot carries no event channels, so the panel is not drawn and the figure has the cumulative record alone |
 | `wrap` | bool | `true` | Whether the response pen wraps. `false` disables pen reset entirely |
-| `reset_responses` | int | *(canonical 550)* | Pen-reset interval when `wrap=true`. Must be a positive integer; ignored when `wrap=false` |
+| `reset_responses` | int | *(canonical 550)* | Pen-reset interval when `wrap=true`. Must be a positive integer; ignored when `wrap=false`. It does not fix the response axis: with fewer responses than the interval, the axis fits the record |
 
 ### Status codes
 
