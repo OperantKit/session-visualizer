@@ -153,7 +153,7 @@ data: {...}
 |------|---|------|------|
 | `theme` | string | `readable` | `/theme.json` が返す任意の id |
 | `fmt` | string | `png` | `png` / `svg` / `pdf` のいずれか |
-| `show_event_pen` | bool | `true` | F&S 式の event pen を累積記録の下に描画するか |
+| `show_event_pen` | bool | `true` | F&S 式の event pen を累積記録の下に描画するか。snapshot は出来事の列を持たないので下段は描かれず、図は累積記録だけになる |
 | `wrap` | bool | `true` | ペンのラップの有効/無効。`false` でリセット機構を丸ごと無効化 |
 | `reset_responses` | int | *(正典 550)* | `wrap=true` 時のリセット間隔。正整数のみ。`wrap=false` では無視 |
 
@@ -182,7 +182,7 @@ Ferster & Skinner 方式の IRT コード化累積記録。各応答を直前 IR
 | `irt_threshold_sec` | float | **必須** | 正値。直前 IRT ≥ 閾値は "long"、それ未満は "short" |
 | `theme` | string | `readable` | `/theme.json` が返す任意の id |
 | `fmt` | string | `png` | `png` / `svg` / `pdf` のいずれか |
-| `show_event_pen` | bool | `true` | F&S 式の event pen を描画するか |
+| `show_event_pen` | bool | `true` | F&S 式の event pen を描画するか。snapshot は出来事の列を持たないので下段は描かれず、図は累積記録だけになる |
 | `reset_responses` | int | *(正典 550)* | ペンリセット間隔。`0` でラップ無効化。負値は拒否 |
 
 ### ステータスコード

@@ -156,7 +156,7 @@ themselves, or for users who want a canonical paper-grade output.
 |------|------|---------|-------|
 | `theme` | string | `readable` | Any id from `/theme.json` |
 | `fmt` | string | `png` | One of `png`, `svg`, `pdf` |
-| `show_event_pen` | bool | `true` | Render the F&S event-pen trace below the cumulative record |
+| `show_event_pen` | bool | `true` | Render the F&S event-pen trace below the cumulative record. The snapshot carries no event channels, so the panel is not drawn and the figure has the cumulative record alone |
 | `wrap` | bool | `true` | Whether the response pen wraps. `false` disables pen reset entirely |
 | `reset_responses` | int | *(canonical 550)* | Pen-reset interval when `wrap=true`. Must be a positive integer; ignored when `wrap=false` |
 
@@ -186,7 +186,7 @@ Intended for visualizing DRL / DRO performance.
 | `irt_threshold_sec` | float | **required** | Positive. Responses with preceding IRT ≥ this are "long"; shorter are "short" |
 | `theme` | string | `readable` | Any id from `/theme.json` |
 | `fmt` | string | `png` | One of `png`, `svg`, `pdf` |
-| `show_event_pen` | bool | `true` | Render the F&S event-pen trace below the cumulative record |
+| `show_event_pen` | bool | `true` | Render the F&S event-pen trace below the cumulative record. The snapshot carries no event channels, so the panel is not drawn and the figure has the cumulative record alone |
 | `wrap` | bool | `true` | Whether the response pen wraps. `false` disables pen reset entirely |
 | `reset_responses` | int | *(canonical 550)* | Pen-reset interval when `wrap=true`. Must be a positive integer; ignored when `wrap=false` |
 
